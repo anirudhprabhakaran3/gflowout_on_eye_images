@@ -21,8 +21,8 @@ MOMENTUM = 0.9
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"The device being used is: {device}.")
 
-train_data_path = "/home/anirudh/mldata/diabetic_retinopathy_dataset/experiments/train"
-val_data_path = "/home/anirudh/mldata/diabetic_retinopathy_dataset/experiments/val"
+train_data_path = "/home/anirudh/mldata/ocular-disease/data/experiments/train"
+val_data_path = "/home/anirudh/mldata/ocular-disease/data/experiments/val"
 
 img_transforms = transforms.Compose([
     transforms.Resize((IMG_SIZE, IMG_SIZE)),
