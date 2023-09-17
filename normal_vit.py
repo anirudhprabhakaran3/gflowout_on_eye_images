@@ -6,7 +6,7 @@ import gc
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from models import ResNet, ResidualBlock
+from models import ViT
 from data import get_datasets, get_dataloaders
 
 IMG_SIZE = 224
@@ -38,7 +38,7 @@ images, label = next(iter(train_loader))
 print(images.shape)
 print(label.shape)
 
-model = ResNet(ResidualBlock, [3, 4, 6, 3]).to(device)
+model = ViT().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY, momentum=MOMENTUM)
 loss_history = []
