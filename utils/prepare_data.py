@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 import shutil
 from torchvision import transforms
 import os
-from utils.config import config
+from config import config
 
 df = pd.read_csv("/content/ocular-disease/data/dataset.csv")
 DATA_PATH = "/content/ocular-disease/data"
