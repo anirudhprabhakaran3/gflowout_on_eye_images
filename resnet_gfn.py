@@ -12,6 +12,18 @@ from utils.config import config
 from data import get_datasets, get_dataloaders
 from models.ResNet_GFN import ResNetGFN
 
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("-tr", "--trainpath", help="Train data path")
+parser.add_argument("-te", "--testpath", help="Test data path")
+
+args = parser.parse_args()
+train_data_path, val_data_path = args.trainpath, args.testpath
+
+print(f"Train data path: {train_data_path}, test data path: {val_data_path}")
+
 
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -22,13 +34,11 @@ def setup_seed(seed):
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Devide being used is: {device}.")
 cudnn.benchmark = True
 
 current_time = time.strftime("%Y%m%d%H%M%S", time.localtime())
 print(f"Current time is: {current_time}")
-
-train_data_path = "/home/anirudh/mldata/ocular-disease/data/experiments/train"
-val_data_path = "/home/anirudh/mldata/ocular-disease/data/experiments/val"
 
 img_transforms = transforms.Compose(
     [transforms.Resize((config.IMG_SIZE, config.IMG_SIZE)), transforms.ToTensor()]
@@ -47,6 +57,7 @@ def train(**kwargs):
         setup_seed(config.seed)
     best_val_loss = 1e9
     model = ResNetGFN()
+    model = model.to(device)
     input_, target = next(iter(train_loader))
     summary(model, input_data=[input_, target])
     model.train()
@@ -135,7 +146,7 @@ def train(**kwargs):
                 loss.backward()
 
                 optimizer.step()
-                loss_meter.add(loss.cpu().data)
+                loss_meter.add(loss.data)
                 accuracy_meter.add(score.data, target.data)
 
             if config.gfn_dropout:

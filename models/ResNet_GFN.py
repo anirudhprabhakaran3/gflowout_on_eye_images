@@ -171,6 +171,8 @@ class ResNetGFN(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, y, mask="none"):
+        x, y = x.to(self.device), y.to(self.device)
+
         # using GFlowNet
         if self.training:
             (
@@ -557,10 +559,10 @@ class ResNetGFN(nn.Module):
         metric["acc"] = acc
 
         COR_qz = np.corrcoef(
-            LogPF_qz.cpu().detach().numpy(), LogR_unconditional.cpu().detach().numpy()
+            LogPF_qz.detach().numpy(), LogR_unconditional.detach().numpy()
         )[0, 1]
         COR_qzxy = np.corrcoef(
-            LogPF_qzxy.cpu().detach().numpy(), LogR_conditional.cpu().detach().numpy()
+            LogPF_qzxy.detach().numpy(), LogR_conditional.detach().numpy()
         )[0, 1]
 
         metric["COR_qz"] = COR_qz

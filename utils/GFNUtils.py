@@ -1,17 +1,22 @@
 import torch
 import torch.nn as nn
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class RandomMaskGenerator(nn.Module):
     def __init__(self, dropout_rate):
         super(RandomMaskGenerator, self).__init__()
-        self.dropout_rate = torch.tensor(dropout_rate).type(torch.float32)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.dropout_rate = torch.tensor(dropout_rate).type(torch.float32).to(DEVICE)
+
+        self.to(DEVICE)
 
     def forward(self, x):
+        x = x.to(DEVICE)
         return torch.bernoulli((1 - self.dropout_rate) * torch.ones(x.shape))
 
     def log_prob(self, x, mask):
+        x, mask = x.to(DEVICE), mask.to(DEVICE)
         dist = (1.0 - self.dropout_rate) * torch.ones(x.shape).to(self.device)
         probs = dist * mask + (1.0 - dist) * (1.0 - mask)
         return torch.log(probs).sum(1)
@@ -34,7 +39,14 @@ class MLP(nn.Module):
         self.out_layer = nn.Linear(h_old, out_dim)
         self.activation = activation
 
+        self.fc = self.fc.to(DEVICE)
+        self.LN = self.LN.to(DEVICE)
+        self.out_layer = self.out_layer(DEVICE)
+
+        self.to(DEVICE)
+
     def forward(self, x):
+        x = x.to(DEVICE)
         for layer, ln in zip(self.fc, self.LN):
             x = self.activation()(layer(x))
             x = ln(x)
@@ -49,9 +61,8 @@ class MLPMaskGenerator(nn.Module):
         self.mlp = MLP(
             in_dim=in_dim, out_dim=out_dim, hidden=hidden, activation=activation
         )
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.to(self.device)
+        self.to(DEVICE)
+        self.mlp = self.mlp.to(DEVICE)
 
     def _dist(self, x, T=1.0):
         x = self.mlp(x)
@@ -60,6 +71,7 @@ class MLPMaskGenerator(nn.Module):
         return x.to(self.device)
 
     def forward(self, x, T=1.0):
+        x = x.to(DEVICE)
         probs_sampled = self._dist(x, T)
         return torch.bernoulli(probs_sampled)
 
@@ -113,6 +125,7 @@ class MultiMLPMaskGenerator(nn.Module):
         return x.to(self.device)
 
     def forward(self, x1, x2, x3, T=1.0):
+        x1, x2, x3 = x1.to(DEVICE), x2.to(DEVICE), x3.to(DEVICE)
         probs_sampled = self._dist(x1, x2, x3, 1.0)
         return torch.bernoulli(probs_sampled)
 
@@ -142,7 +155,11 @@ class CNN_(nn.Module):
         self.LN2 = nn.LayerNorm(32)
         self.LN3 = nn.LayerNorm(16)
 
+        self.to(DEVICE)
+
     def forward(self, x):
+        x = x.to(DEVICE)
+
         x = self.LN(x)
         x = self.pool(self.activation()(self.conv1(x)))
         x = self.pool(self.activation()(self.conv2(x)))
@@ -165,7 +182,11 @@ class CNN_MLP(nn.Module):
         self.MLP = MLP(in_dim=mlp_in_dim, out_dim=10)
         self.MLP_combine = MLP(in_dim=20, out_dim=out_dim)
 
+        self.to(DEVICE)
+
     def forward(self, x, y):
+        x, y = x.to(DEVICE), y.to(DEVICE)
+
         vec1 = self.CNN(x)
         vec2 = self.MLP(y)
 
