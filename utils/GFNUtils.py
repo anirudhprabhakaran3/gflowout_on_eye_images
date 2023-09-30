@@ -129,6 +129,18 @@ class MultiMLPMaskGenerator(nn.Module):
         probs_sampled = self._dist(x1, x2, x3, 1.0)
         return torch.bernoulli(probs_sampled)
 
+    def log_prob(self, x1, x2, x3, m):
+        dist = self._dist(x1, x2, x3, 1.0)
+        probs = dist * m + (1.0 - dist) * (1.0 - m)
+        return torch.log(probs).sum(1)
+
+    def prob(self, x1, x2, x3, m):
+        dist = self._dist(
+            x1, x2, x3, 1.0
+        )  # calculate probability using original policy always
+        probs = dist * m + (1.0 - dist) * (1.0 - m)
+        return probs
+
 
 class CNN_(nn.Module):
     def __init__(
@@ -225,7 +237,7 @@ def construct_multiinput_conditional_mask_generators(
         if layer_idx == 0:
             in_dim1 = n_channels[layer_idx]
             in_dim2 = layer_dims[layer_idx]
-            in_dim2 = additional_input_dims[layer_idx]
+            in_dim3 = additional_input_dims[layer_idx]
 
             out_dim = n_channels[layer_idx]
         else:
