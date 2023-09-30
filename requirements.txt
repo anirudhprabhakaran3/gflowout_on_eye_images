@@ -41,7 +41,6 @@ python-dateutil==2.8.2
 pytz==2022.7
 requests==2.31.0
 scikit-learn==1.2.2
-scikit-learn-intelex==20230426.111612
 scipy==1.11.1
 setuptools==68.0.0
 sip==6.6.2
