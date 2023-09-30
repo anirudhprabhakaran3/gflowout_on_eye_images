@@ -23,13 +23,16 @@ print(f"The device being used is: {device}.")
 train_data_path = "/home/anirudh/mldata/ocular-disease/data/experiments/train"
 val_data_path = "/home/anirudh/mldata/ocular-disease/data/experiments/val"
 
-img_transforms = transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.ToTensor()
-])
+img_transforms = transforms.Compose(
+    [transforms.Resize((IMG_SIZE, IMG_SIZE)), transforms.ToTensor()]
+)
 
-train_dataset, test_dataset = get_datasets(train_data_path, val_data_path, img_transforms)
-train_loader, test_loader = get_dataloaders(train_dataset, test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+train_dataset, test_dataset = get_datasets(
+    train_data_path, val_data_path, img_transforms
+)
+train_loader, test_loader = get_dataloaders(
+    train_dataset, test_dataset, batch_size=BATCH_SIZE, shuffle=True
+)
 
 print(len(train_loader))
 print(len(test_loader))
@@ -38,9 +41,12 @@ images, label = next(iter(train_loader))
 print(images.shape)
 print(label.shape)
 
-model = ViT().to(device)
+model = ViT(patch_size=32, emb_size=100, depth=1).to(device)
+print(model)
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY, momentum=MOMENTUM)
+optimizer = optim.SGD(
+    model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY, momentum=MOMENTUM
+)
 loss_history = []
 
 for epoch in range(N_EPOCHS):
