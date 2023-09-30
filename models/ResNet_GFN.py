@@ -259,6 +259,7 @@ class ResNetGFN(nn.Module):
         for layer_idx in range(len(self.mask_generator_input_shapes)):
             if mask == "topdown":
                 EPSILON = random.uniform(0, 1)
+                qz_p_l = None
                 if layer_idx == 0:
                     if (EPSILON < self.random_chance) and (self.training):
                         qz_mask_l = self.random_mask_generator(
@@ -270,7 +271,7 @@ class ResNetGFN(nn.Module):
                         qz_mask_l = self.q_z_mask_generators[layer_idx](
                             torch.zeros(batch_size, 784).to(self.device), temperature
                         )  # 784 is an arbitrary number here.
-                    qz_q_l = self.q_z_mask_generators[layer_idx].prob(
+                    qz_p_l = self.q_z_mask_generators[layer_idx].prob(
                         torch.zeros(batch_size, 784).to(self.device), qz_mask_l
                     )
                 else:
@@ -289,7 +290,7 @@ class ResNetGFN(nn.Module):
                         qz_mask_l = self.q_z_mask_generators[layer_idx](
                             previous_mask, temperature
                         ).to(self.device)
-                    qz_p_l = self.q_z_mask_generators[layer_idx].prov(
+                    qz_p_l = self.q_z_mask_generators[layer_idx].prob(
                         previous_mask.to(self.device), qz_mask_l.to(self.device)
                     )
 

@@ -18,9 +18,11 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("-tr", "--trainpath", help="Train data path")
 parser.add_argument("-te", "--testpath", help="Test data path")
+parser.add_argument("-m", "--mask", help="Mask (can be none, topdown, bottomup)")
 
 args = parser.parse_args()
 train_data_path, val_data_path = args.trainpath, args.testpath
+config.mask = args.mask or config.mask
 
 print(f"Train data path: {train_data_path}, test data path: {val_data_path}")
 
@@ -34,7 +36,7 @@ def setup_seed(seed):
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Devide being used is: {device}.")
+print(f"Devide being used is: {device}. Mask being used is: {config.mask}")
 cudnn.benchmark = True
 
 current_time = time.strftime("%Y%m%d%H%M%S", time.localtime())

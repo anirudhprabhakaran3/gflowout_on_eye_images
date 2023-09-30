@@ -17,7 +17,7 @@ class RandomMaskGenerator(nn.Module):
 
     def log_prob(self, x, mask):
         x, mask = x.to(DEVICE), mask.to(DEVICE)
-        dist = (1.0 - self.dropout_rate) * torch.ones(x.shape).to(self.device)
+        dist = (1.0 - self.dropout_rate) * torch.ones(x.shape).to(DEVICE)
         probs = dist * mask + (1.0 - dist) * (1.0 - mask)
         return torch.log(probs).sum(1)
 
@@ -68,7 +68,7 @@ class MLPMaskGenerator(nn.Module):
         x = self.mlp(x)
         x = nn.Sigmoid()(x / T)
         dist = x
-        return x.to(self.device)
+        return x.to(DEVICE)
 
     def forward(self, x, T=1.0):
         x = x.to(DEVICE)

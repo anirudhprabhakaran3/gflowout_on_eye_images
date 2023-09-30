@@ -24,7 +24,7 @@ class Config:
         self.gfn_model_training = True
         self.seed = 0
         self.optimizer = "adam"
-        self.mask = "none"
+        self.mask = "topdown"
 
 
 config = Config()
