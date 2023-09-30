@@ -554,15 +554,15 @@ class ResNetGFN(nn.Module):
         acc = (torch.argmax(logits, dim=1) == y).sum().item() / len(y)
 
         metric["CELoss"] = CELoss.mean().item()
-        metric["GFN_loss_unconfitional"] = GFN_loss_unconditional.mean().item()
-        metric["GFN_loss_confitional"] = GFN_loss_conditional.mean().item()
+        metric["GFN_loss_unconditional"] = GFN_loss_unconditional.mean().item()
+        metric["GFN_loss_conditional"] = GFN_loss_conditional.mean().item()
         metric["acc"] = acc
 
         COR_qz = np.corrcoef(
-            LogPF_qz.detach().numpy(), LogR_unconditional.detach().numpy()
+            LogPF_qz.cpu().detach().numpy(), LogR_unconditional.cpu().detach().numpy()
         )[0, 1]
         COR_qzxy = np.corrcoef(
-            LogPF_qzxy.detach().numpy(), LogR_conditional.detach().numpy()
+            LogPF_qzxy.cpu().detach().numpy(), LogR_conditional.cpu().detach().numpy()
         )[0, 1]
 
         metric["COR_qz"] = COR_qz

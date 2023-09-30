@@ -41,7 +41,7 @@ class MLP(nn.Module):
 
         self.fc = self.fc.to(DEVICE)
         self.LN = self.LN.to(DEVICE)
-        self.out_layer = self.out_layer(DEVICE)
+        self.out_layer = self.out_layer.to(DEVICE)
 
         self.to(DEVICE)
 
