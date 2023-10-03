@@ -9,6 +9,8 @@ from torchvision import transforms
 from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange, Reduce
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class PatchEmbedding(nn.Module):
     def __init__(self, in_channels=3, patch_size=16, emb_size=768, img_size=224):
@@ -23,7 +25,11 @@ class PatchEmbedding(nn.Module):
             torch.randn((img_size // patch_size) ** 2 + 1, emb_size)
         )
 
+        self.to(DEVICE)
+
     def forward(self, x):
+        x = x.to(DEVICE)
+
         b, _, _, _ = x.shape
         x = self.projection(x)
         cls_tokens = repeat(self.cls_token, "() n e -> b n e", b=b)
@@ -41,7 +47,11 @@ class MultiHeadAttention(nn.Module):
         self.att_drop = nn.Dropout(dropout)
         self.projection = nn.Linear(emb_size, emb_size)
 
+        self.to(DEVICE)
+
     def forward(self, x, mask=None):
+        x, mask = x.to(DEVICE), mask.to(DEVICE)
+
         qkv = rearrange(
             self.qkv(x), "b n (h d qkv) -> (qkv) b h n d", h=self.num_heads, qkv=3
         )
@@ -64,8 +74,10 @@ class ResidualAdd(nn.Module):
     def __init__(self, fn):
         super(ResidualAdd, self).__init__()
         self.fn = fn
+        self.to(DEVICE)
 
     def forward(self, x, **kwargs):
+        x = x.to(DEVICE)
         res = x
         x = self.fn(x, **kwargs)
         x += res
@@ -80,6 +92,7 @@ class FeedForwardBlock(nn.Sequential):
             nn.Dropout(drop_p),
             nn.Linear(expansion * emb_size, emb_size),
         )
+        self.to(DEVICE)
 
 
 class TransformerEncoderBlock(nn.Sequential):
@@ -109,6 +122,7 @@ class TransformerEncoderBlock(nn.Sequential):
                 )
             ),
         )
+        self.to(DEVICE)
 
 
 class TransformerEncoder(nn.Sequential):
@@ -116,6 +130,7 @@ class TransformerEncoder(nn.Sequential):
         super(TransformerEncoder, self).__init__(
             *[TransformerEncoderBlock(**kwargs) for _ in range(depth)]
         )
+        self.to(DEVICE)
 
 
 class ClassificationHead(nn.Sequential):
@@ -125,6 +140,7 @@ class ClassificationHead(nn.Sequential):
             nn.LayerNorm(emb_size),
             nn.Linear(emb_size, n_classes),
         )
+        self.to(DEVICE)
 
 
 class ViT(nn.Sequential):
@@ -143,3 +159,4 @@ class ViT(nn.Sequential):
             TransformerEncoder(depth, emb_size=emb_size, **kwargs),
             ClassificationHead(emb_size, n_classes),
         )
+        self.to(DEVICE)

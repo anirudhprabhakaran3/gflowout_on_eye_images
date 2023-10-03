@@ -1,4 +1,7 @@
+import torch
 import torch.nn as nn
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ResidualBlock(nn.Module):
@@ -20,7 +23,10 @@ class ResidualBlock(nn.Module):
         self.relu = nn.ReLU()
         self.out_channels = out_channels
 
+        self.to(DEVICE)
+
     def forward(self, x):
+        x = x.to(DEVICE)
         residual = x
         out = self.conv1(x)
         out = self.conv2(out)
@@ -48,6 +54,8 @@ class ResNet(nn.Module):
         self.avgpool = nn.AvgPool2d(7, stride=1)
         self.fc = nn.Linear(512, num_classes)
 
+        self.to(DEVICE)
+
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes:
@@ -63,6 +71,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        x = x.to(DEVICE)
         x = self.conv1(x)
         x = self.maxpool(x)
         x = self.layer0(x)
