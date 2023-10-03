@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
+from torchinfo import summary
 import gc
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -36,15 +37,13 @@ train_loader, test_loader = get_dataloaders(
     train_dataset, test_dataset, batch_size=config.BATCH_SIZE, shuffle=True
 )
 
-print(len(train_loader))
-print(len(test_loader))
-
 images, label = next(iter(train_loader))
-print(images.shape)
-print(label.shape)
+print(f"Image shape: {images.shape}")
+print(f"Label shape: {label.shape}")
 
 model = ViT(patch_size=32, emb_size=100, depth=1).to(device)
-print(model)
+summary(model, input_data=images)
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(
     model.parameters(),
