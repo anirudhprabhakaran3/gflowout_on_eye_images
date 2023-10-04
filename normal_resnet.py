@@ -41,6 +41,7 @@ print(len(train_loader))
 print(len(test_loader))
 
 images, label = next(iter(train_loader))
+images, label = images.to(device), label.to(device)
 print(f"Image shape: {images.shape}")
 print(f"Label shape: {label.shape}")
 
