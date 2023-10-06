@@ -190,7 +190,7 @@ class CNN_MLP(nn.Module):
     def __init__(self, CNN_in_dim, mlp_in_dim, out_dim=10, activation=nn.LeakyReLU):
         super(CNN_MLP, self).__init__()
 
-        self.CNN = CNN_(image_shape=CNN_in_dim, out_dim=10, hidden=48400)
+        self.CNN = CNN_(image_shape=CNN_in_dim, out_dim=10, hidden=784)
         self.MLP = MLP(in_dim=mlp_in_dim, out_dim=10)
         self.MLP_combine = MLP(in_dim=20, out_dim=out_dim)
 

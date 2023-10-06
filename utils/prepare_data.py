@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split
 import shutil
 from torchvision import transforms
 import os
-from config import config
 
 df = pd.read_csv("/content/ocular-disease/data/dataset.csv")
 DATA_PATH = "/content/ocular-disease/data"
@@ -52,14 +51,3 @@ def create_files(dataset, dataloader_folder):
 
 create_files(X_train, TRAIN_DATALOADER_FOLDER)
 create_files(X_test, VAL_DATALOADER_FOLDER)
-
-# from torchvision import datasets
-# from torch.utils.data import DataLoader
-
-# train_dataset = datasets.ImageFolder(
-#     "/content/dataloader/train", transform=img_transforms
-# )
-# val_dataset = datasets.ImageFolder("/content/dataloader/val", transform=img_transforms)
-
-# train_dataloader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True)
-# val_dataloader = DataLoader(val_dataset, batch_size=config.BATCH_SIZE, shuffle=True)
