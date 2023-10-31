@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import models
+import timm
 
 import random
 import numpy as np
@@ -16,28 +16,19 @@ from utils.GFNUtils import (
 from utils.options import Options
 
 
-class ResNetGFN(nn.Module):
+class VitGFN(nn.Module):
     def __init__(
         self, num_classes=2, lambas=0, activation=nn.LeakyReLU, opt: Options = None
     ):
-        super(ResNetGFN, self).__init__()
+        super(VitGFN, self).__init__()
 
         self.opt = opt
         self.num_classes = num_classes
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        if opt.use_pretrained:
-            self.resnet = models.resnet18(
-                weights=models.ResNet18_Weights.DEFAULT, num_classes=1000
-            )
-            self.resnet.fc = nn.Linear(512, num_classes)
-        else:
-            self.resnet = models.resnet18(weights=None, num_classes=num_classes)
-
-        self.resnet.conv1 = torch.nn.Conv2d(
-            3, 64, kernel_size=3, stride=1, padding=1, bias=False
+        self.vit = timm.create_model(
+            "vit_base_patch8_224", pretrained=opt.use_pretrained, num_classes=2
         )
-        self.resnet.maxpool = torch.nn.Identity()
 
         # GFN Related Code
         # Adapated from Dianbo Liu
@@ -45,14 +36,14 @@ class ResNetGFN(nn.Module):
         self.temperature = 2  # Temperature in sigmoid, high temperature more close the p to 0.5 for binary mask
 
         self.mask_generator_input_shapes = [
-            (64, self.opt.image_size, self.opt.image_size),
-            (64, self.opt.image_size, self.opt.image_size),
-            (128, int(self.opt.image_size/2), int(self.opt.image_size/2)),
-            (128, int(self.opt.image_size/2), int(self.opt.image_size/2)),
-            (256, int(self.opt.image_size/4), int(self.opt.image_size/4)),
-            (256, int(self.opt.image_size/4), int(self.opt.image_size/4)),
-            (512, int(self.opt.image_size/8), int(self.opt.image_size/8)),
-            (512, int(self.opt.image_size/8), int(self.opt.image_size/8)),
+            (64, 32, 32),
+            (64, 32, 32),
+            (128, 16, 16),
+            (128, 16, 16),
+            (256, 8, 8),
+            (256, 8, 8),
+            (512, 4, 4),
+            (512, 4, 4),
         ]  # Only apply dropout on the last two blocks of ResNet18
 
         self.rand_mask_generator = RandomMaskGenerator(dropout_rate=opt.mlp_dr)
@@ -141,12 +132,9 @@ class ResNetGFN(nn.Module):
                 "weight_decay": 0.1,
             },
         ]
-        self.q_zxy_optimizer = optim.Adam(q_zxy_param_list)
 
-        if self.opt.tune_last_layer_only:
-            task_model_param_list = [{"params": self.resnet.fc.parameters(), "lr": lr}]
-        else:
-            task_model_params_list = [{"params": self.resnet.parameters(), "lr": lr}]
+        self.q_zxy_optimizer = optim.Adam(q_zxy_param_list)
+        task_model_param_list = [{"params": self.vit.parameters(), "lr": lr}]
 
         self.task_model_optimizer = optim.SGD(
             task_model_param_list, momentum=0.9, weight_decay=5e-4
@@ -219,7 +207,23 @@ class ResNetGFN(nn.Module):
                 logits.append(logits_.unsqueeze(2))
             logits = torch.logsumexp(torch.cat(logits, 2), 2)
 
-        return logits, actual_masks
+        return (
+            logits_,
+            actual_masks,
+            masks_qz,
+            masks_qzxy,
+            LogZ_unconditional,
+            LogPF_qz,
+            LogR_qz,
+            LogPB_qz,
+            LogPF_BNN,
+            LogZ_conditional,
+            LogPF_qzxy,
+            LogR_qzxy,
+            LogPB_qzxy,
+            Log_pzx,
+            Log_pz,
+        )
 
     def GFN_forward(self, x, y, mask="none"):
         ###during inference y are not used
@@ -336,219 +340,191 @@ class ResNetGFN(nn.Module):
         actual_masks = []
         masks_conditional = []
 
-        x = self.resnet.conv1(x)
-        x = self.resnet.bn1(x)
-        x = self.resnet.relu(x)
-        x = self.resnet.maxpool(x)
+        x = self.vit.patch_embed(x)
+        x = self.vit.pos_drop(x)
+        x = self.vit.norm_pre(x)
 
-        ##resnet18 has 4 layers, each with 2 blocks
+        # There is one blocks layer, that consists of 12 blocks.
         block_idx = 0
-        for layer in [
-            self.resnet.layer1,
-            self.resnet.layer2,
-            self.resnet.layer3,
-            self.resnet.layer4,
-        ]:  # number of layers changes over architecture
-            for blockid in range(2):  ##number block per layer changes over architecture
-                identity = x
-                out = layer[blockid].conv1(x)
-                out = layer[blockid].bn1(out)
-                out = layer[blockid].relu(out)
+        for block in self.vit.blocks:
+            out = block.norm1(x)
+            out = block.attn(out)
+            out = block.ls1(out)
+            out = block.drop_path1(out)
+            out = block.norm2(out)
+            out = block.mlp(out)
+            out = block.ls2(out)
 
-                out = layer[blockid].conv2(out)
-                out = layer[blockid].bn2(out)
+            # print("self.training",self.training)
 
-                if layer[blockid].downsample is not None:
-                    identity = layer[blockid].downsample(x)
+            #####different masks generator
+            # how many to dropout is a design choice, this version all layers dropout
+            ####if using random masks
+            EPSILON = random.uniform(0, 1)
 
-                # print("self.training",self.training)
+            # layer_idx=block_idx-6
+            layer_idx = block_idx
 
-                #####different masks generator
-                if (
-                    block_idx >= 0
-                ):  # how many to dropout is a design choice, this version all layers dropout
-                    ####if using random masks
-                    EPSILON = random.uniform(0, 1)
+            if mask == "bottomup":
+                if self.training:
+                    # during training use q(z|x,y;phi) to sample mask
+                    # print("using q(z|x,y;phi)")#check the right function is used
 
-                    # layer_idx=block_idx-6
-                    layer_idx = block_idx
-
-                    if "bottomup" in mask:
-                        if self.training:
-                            # during training use q(z|x,y;phi) to sample mask
-                            # print("using q(z|x,y;phi)")#check the right function is used
-
-                            if layer_idx == 0:
-                                if EPSILON >= self.random_chance:
-                                    m_conditional_l = self.q_zxy_mask_generators[
-                                        layer_idx
-                                    ](
-                                        torch.zeros(batch_size, out.shape[1]).to(
-                                            self.device
-                                        ),
-                                        out.reshape(batch_size, -1).clone().detach(),
-                                        y.float().clone().detach(),
-                                        temperature,
-                                    )  # generate mask based on activation from previous layer, detach from BNN training
-                                else:
-                                    m = self.rand_mask_generator(
-                                        torch.zeros(out.shape[0], out.shape[1])
-                                    ).to(self.device)
-                                    m_conditional_l = m
-
-                                qzxy_p_l = self.q_zxy_mask_generators[layer_idx].prob(
-                                    torch.zeros(batch_size, out.shape[1]).to(
-                                        self.device
-                                    ),
-                                    out.reshape(batch_size, -1).clone().detach(),
-                                    y.float().clone().detach(),
-                                    m_conditional_l,
-                                )
-
-                            else:
-                                previous_actual_mask = []  # use previous actual masks
-                                for j in range(layer_idx):
-                                    previous_actual_mask.append(actual_masks[j])
-                                previous_actual_mask = torch.cat(
-                                    previous_actual_mask, 1
-                                )
-
-                                if EPSILON >= self.random_chance:
-                                    m_conditional_l = self.q_zxy_mask_generators[
-                                        layer_idx
-                                    ](
-                                        previous_actual_mask,
-                                        out.reshape(batch_size, -1).clone().detach(),
-                                        y.float().clone().detach(),
-                                        temperature,
-                                    )
-
-                                else:  # during training ,of a centain chance a random policy will be used to explore the space
-                                    m = self.rand_mask_generator(
-                                        torch.zeros(out.shape[0], out.shape[1])
-                                    ).to(self.device)
-                                    m_conditional_l = m
-                                qzxy_p_l = self.q_zxy_mask_generators[layer_idx].prob(
-                                    previous_actual_mask,
-                                    out.reshape(batch_size, -1).clone().detach(),
-                                    y.float().clone().detach(),
-                                    m_conditional_l,
-                                )
-
-                            masks_conditional.append(m_conditional_l)
-                            ###add log P_F_Z to the GFN loss
-
-                            LogPF_qzxy += (
-                                m_conditional_l * torch.log(qzxy_p_l)
-                                + (1 - m_conditional_l) * torch.log(1 - qzxy_p_l)
-                            ).sum(1)
-
-                            LogPB_qzxy -= 0
-
-                        else:
-                            # during inference use p(z|x;xi) to sample mask
-                            # print("using p(z|x;xi)")#check the right function is used
-
-                            if layer_idx == 0:
-                                m_conditional_l = self.p_zx_mask_generators[layer_idx](
-                                    out.clone().detach().reshape(out.shape[0], -1)
-                                )
-
-                            else:
-                                previous_actual_mask = []  # use previous actual masks
-                                for j in range(layer_idx):
-                                    previous_actual_mask.append(actual_masks[j])
-                                # print("layer_idx",layer_idx)
-                                # print("out",out.shape)
-                                # print("actual_masks[j]",actual_masks[j].shape)
-                                ###calculate p(z|x;xi)
-                                input_pzx = torch.cat(
-                                    previous_actual_mask
-                                    + [out.clone().detach().reshape(out.shape[0], -1)],
-                                    1,
-                                )
-                                # print("input_pzx",input_pzx.shape,x.shape)
-                                m_conditional_l = self.p_zx_mask_generators[layer_idx](
-                                    input_pzx
-                                )  # generate mask based on activation from previous layer, detach from BNN training
-
-                            masks_conditional.append(m_conditional_l)
-
-                    else:
-                        masks_conditional.append(torch.ones(out.shape).to(self.device))
-
-                    if mask == "random":  # completely random mask used
-                        EPSILON = random.uniform(0, 1)
-                        m = self.rand_mask_generator(
-                            torch.zeros(out.shape[0], out.shape[1])
-                        ).to(self.device)
-
-                    elif mask == "topdown":
-                        m_qz_l = masks_qz[layer_idx][-1]
-                        m = m_qz_l
-                    elif mask == "bottomup":
-                        m = m_conditional_l
-
-                    elif mask == "none":
-                        m = torch.ones(out.shape[0], out.shape[1]).to(self.device)
-
-                    m = (
-                        m.detach().clone()
-                    )  # mask should not interfere backbone model(MLP or resnet etc) training
-
-                    ###calculate p(z;xi) and p(z|x;xi) both of which are needed for training
                     if layer_idx == 0:
-                        ###calculate p(z|x;xi)
-                        Log_P_zx_l = self.p_zx_mask_generators[layer_idx].log_prob(
-                            out.reshape(batch_size, -1).clone().detach(), m
+                        if EPSILON >= self.random_chance:
+                            m_conditional_l = self.q_zxy_mask_generators[layer_idx](
+                                torch.zeros(batch_size, out.shape[1]).to(self.device),
+                                out.reshape(batch_size, -1).clone().detach(),
+                                y.float().clone().detach(),
+                                temperature,
+                            )  # generate mask based on activation from previous layer, detach from BNN training
+                        else:
+                            m = self.rand_mask_generator(
+                                torch.zeros(out.shape[0], out.shape[1])
+                            ).to(self.device)
+                            m_conditional_l = m
+
+                        qzxy_p_l = self.q_zxy_mask_generators[layer_idx].prob(
+                            torch.zeros(batch_size, out.shape[1]).to(self.device),
+                            out.reshape(batch_size, -1).clone().detach(),
+                            y.float().clone().detach(),
+                            m_conditional_l,
                         )
-                        # calculate p(z|xi)
-                        Log_P_z_l = self.p_z_mask_generators.log_prob(m, m)
 
                     else:
                         previous_actual_mask = []  # use previous actual masks
                         for j in range(layer_idx):
                             previous_actual_mask.append(actual_masks[j])
+                        previous_actual_mask = torch.cat(previous_actual_mask, 1)
 
+                        if EPSILON >= self.random_chance:
+                            m_conditional_l = self.q_zxy_mask_generators[layer_idx](
+                                previous_actual_mask,
+                                out.reshape(batch_size, -1).clone().detach(),
+                                y.float().clone().detach(),
+                                temperature,
+                            )
+
+                        else:  # during training ,of a centain chance a random policy will be used to explore the space
+                            m = self.rand_mask_generator(
+                                torch.zeros(out.shape[0], out.shape[1])
+                            ).to(self.device)
+                            m_conditional_l = m
+                        qzxy_p_l = self.q_zxy_mask_generators[layer_idx].prob(
+                            previous_actual_mask,
+                            out.reshape(batch_size, -1).clone().detach(),
+                            y.float().clone().detach(),
+                            m_conditional_l,
+                        )
+
+                    masks_conditional.append(m_conditional_l)
+                    ###add log P_F_Z to the GFN loss
+
+                    LogPF_qzxy += (
+                        m_conditional_l * torch.log(qzxy_p_l)
+                        + (1 - m_conditional_l) * torch.log(1 - qzxy_p_l)
+                    ).sum(1)
+
+                    LogPB_qzxy -= 0
+
+                else:
+                    # during inference use p(z|x;xi) to sample mask
+                    # print("using p(z|x;xi)")#check the right function is used
+
+                    if layer_idx == 0:
+                        m_conditional_l = self.p_zx_mask_generators[layer_idx](
+                            out.clone().detach().reshape(out.shape[0], -1)
+                        )
+
+                    else:
+                        previous_actual_mask = []  # use previous actual masks
+                        for j in range(layer_idx):
+                            previous_actual_mask.append(actual_masks[j])
+                        # print("layer_idx",layer_idx)
+                        # print("out",out.shape)
+                        # print("actual_masks[j]",actual_masks[j].shape)
                         ###calculate p(z|x;xi)
                         input_pzx = torch.cat(
                             previous_actual_mask
-                            + [out.reshape(batch_size, -1).clone().detach()],
+                            + [out.clone().detach().reshape(out.shape[0], -1)],
                             1,
                         )
-
-                        Log_P_zx_l = self.p_zx_mask_generators[layer_idx].log_prob(
-                            input_pzx, m
+                        # print("input_pzx",input_pzx.shape,x.shape)
+                        m_conditional_l = self.p_zx_mask_generators[layer_idx](
+                            input_pzx
                         )  # generate mask based on activation from previous layer, detach from BNN training
 
-                        ###calculate p(z;xi)
+                    masks_conditional.append(m_conditional_l)
 
-                        Log_P_z_l = self.p_z_mask_generators.log_prob(
-                            m, m
-                        )  # generate mask based on activation from previous layer, detach from BNN training
+            else:
+                masks_conditional.append(torch.ones(out.shape).to(self.device))
 
-                    Log_pzx += Log_P_zx_l
-                    Log_pz += Log_P_z_l
+            if mask == "random":  # completely random mask used
+                EPSILON = random.uniform(0, 1)
+                m = self.rand_mask_generator(
+                    torch.zeros(out.shape[0], out.shape[1])
+                ).to(self.device)
 
-                    ###apply the mask
+            elif mask == "topdown":
+                m_qz_l = masks_qz[layer_idx][-1]
+                m = m_qz_l
+            elif mask == "bottomup":
+                m = m_conditional_l
 
-                    out = out.mul(m.unsqueeze(2).unsqueeze(3))
+            elif mask == "none":
+                m = torch.ones(out.shape[0], out.shape[1]).to(self.device)
 
-                    actual_masks.append(m)
+            m = (
+                m.detach().clone()
+            )  # mask should not interfere backbone model(MLP or resnet etc) training
 
-                out += identity
-                out = layer[blockid].relu(out)
-                x = out
+            ###calculate p(z;xi) and p(z|x;xi) both of which are needed for training
+            if layer_idx == 0:
+                ###calculate p(z|x;xi)
+                Log_P_zx_l = self.p_zx_mask_generators[layer_idx].log_prob(
+                    out.reshape(batch_size, -1).clone().detach(), m
+                )
+                # calculate p(z|xi)
+                Log_P_z_l = self.p_z_mask_generators.log_prob(m, m)
 
-                block_idx += 1
+            else:
+                previous_actual_mask = []  # use previous actual masks
+                for j in range(layer_idx):
+                    previous_actual_mask.append(actual_masks[j])
+
+                ###calculate p(z|x;xi)
+                input_pzx = torch.cat(
+                    previous_actual_mask
+                    + [out.reshape(batch_size, -1).clone().detach()],
+                    1,
+                )
+
+                Log_P_zx_l = self.p_zx_mask_generators[layer_idx].log_prob(
+                    input_pzx, m
+                )  # generate mask based on activation from previous layer, detach from BNN training
+
+                ###calculate p(z;xi)
+
+                Log_P_z_l = self.p_z_mask_generators.log_prob(
+                    m, m
+                )  # generate mask based on activation from previous layer, detach from BNN training
+
+            Log_pzx += Log_P_zx_l
+            Log_pz += Log_P_z_l
+
+            ###apply the mask
+            out = out.mul(m.unsqueeze(2).unsqueeze(3))
+            actual_masks.append(m)
+
+            x = out
+            block_idx += 1
 
         ####fc layer
-
-        x = self.resnet.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.resnet.fc(x)
+        x = self.vit.norm(x)
+        x = self.vit.fc_norm(x)
+        x = self.vit.head_drop(x)
+        x = self.vit.head(x)
         pred = x
-        # pred = F.log_softmax(x, dim=1)
 
         return (
             pred,
