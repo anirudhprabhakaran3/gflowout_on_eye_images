@@ -514,9 +514,7 @@ class VitGFN(nn.Module):
 
         ####fc layer
         x = self.vit.norm(x)
-        x = self.vit.fc_norm(x)
-        x = self.vit.head_drop(x)
-        x = self.vit.head(x)
+        x = self.vit.forward_head(x)
         pred = x
 
         return (
@@ -559,7 +557,7 @@ class VitGFN(nn.Module):
 
         y = torch.nn.functional.one_hot(
             y, self.num_classes
-        ).float()
+        )
 
         # loss calculation
         # CEloss = F.nll_loss(logits, y)
