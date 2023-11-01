@@ -45,7 +45,7 @@ class VitGFN(nn.Module):
         self.p_zx_mask_generators = construct_conditional_mask_generators(
             n_channels=[dims[0] for dims in self.mask_generator_input_shapes],
             layer_dims=[
-                dims[0] * dims[1] * dims[2] for dims in self.mask_generator_input_shapes
+                dims[0] * dims[1] for dims in self.mask_generator_input_shapes
             ],
             additional_input_dims=[0 for j in self.mask_generator_input_shapes],
             hiddens=hiddens,
@@ -56,7 +56,7 @@ class VitGFN(nn.Module):
         self.q_zxy_mask_generators = construct_multiinput_conditional_mask_generators(
             n_channels=[dims[0] for dims in self.mask_generator_input_shapes],
             layer_dims=[
-                dims[0] * dims[1] * dims[2] for dims in self.mask_generator_input_shapes
+                dims[0] * dims[1] for dims in self.mask_generator_input_shapes
             ],
             additional_input_dims=[
                 num_classes for j in self.mask_generator_input_shapes
