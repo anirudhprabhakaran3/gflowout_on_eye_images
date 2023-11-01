@@ -555,10 +555,6 @@ class VitGFN(nn.Module):
             Log_pz,
         ) = self.GFN_forward(x, y, mask)
 
-        y = torch.nn.functional.one_hot(
-            y, self.num_classes
-        )
-
         # loss calculation
         # CEloss = F.nll_loss(logits, y)
         # CEloss = F.nll_loss(reduction='none')(logits, y)

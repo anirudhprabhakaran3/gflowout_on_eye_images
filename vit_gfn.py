@@ -479,7 +479,8 @@ def val(model, dataloader, criterion, num_classes, opt):
         for iii in range(opt.sample_num):
             # important step !!!!!!
             if opt.gfn_dropout == True:
-                score, actual_masks = model(input_, label, opt.mask)
+                outputs = model(input_, label, opt.mask)
+                score, actual_masks = outputs[0], outputs[1]
 
                 actual_masks = torch.cat(actual_masks, -1)  # shape
 
