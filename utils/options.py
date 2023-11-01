@@ -18,6 +18,14 @@ class Options:
         t_test=True,
         test_sample_mode="sample",
         use_t_in_testing=True,
+        vit_hidden_size=512,
+        vit_dropout_rate=0.1,
+        vit_multi_head=8,
+        vit_image_feature_size=2048,
+        vit_layers=6,
+        vit_flat_mlp_size=512,
+        vit_flat_glimpses=1,
+        vit_flat_out_size=1024,
     ):
         super(Options, self).__init__()
 
@@ -38,3 +46,15 @@ class Options:
         self.t_test = t_test
         self.test_sample_mode = test_sample_mode
         self.use_t_in_testing = use_t_in_testing
+
+        self.vit_hidden_size = vit_hidden_size
+        self.vit_dropout_rate = vit_dropout_rate
+        self.vit_multi_head = vit_multi_head
+        self.vit_image_feature_size = vit_image_feature_size
+        self.vit_layers = vit_layers
+        self.vit_flat_mlp_size = vit_flat_mlp_size
+        self.vit_flat_glimpses = vit_flat_glimpses
+        self.vit_flat_out_size = vit_flat_out_size
+
+        self.vit_ff_size = int(self.vit_hidden_size * 4)
+        self.vit_hidden_size_head = int(self.vit_hidden_size / self.vit_multi_head)
