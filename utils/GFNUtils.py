@@ -147,7 +147,7 @@ class CNN_(nn.Module):
         self,
         image_shape=(160, 32, 32),
         out_dim=10,
-        hidden=16 * 7 * 7,
+        hidden=16 * 55 * 55,
         activation=nn.LeakyReLU,
     ):
         super(CNN_, self).__init__()

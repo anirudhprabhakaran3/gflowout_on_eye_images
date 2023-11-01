@@ -36,15 +36,8 @@ class VitGFN(nn.Module):
         self.temperature = 2  # Temperature in sigmoid, high temperature more close the p to 0.5 for binary mask
 
         self.mask_generator_input_shapes = [
-            (64, 32, 32),
-            (64, 32, 32),
-            (128, 16, 16),
-            (128, 16, 16),
-            (256, 8, 8),
-            (256, 8, 8),
-            (512, 4, 4),
-            (512, 4, 4),
-        ]  # Only apply dropout on the last two blocks of ResNet18
+            (784, 768),
+        ]*12  # Multiple by 12 as they are identical blocks
 
         self.rand_mask_generator = RandomMaskGenerator(dropout_rate=opt.mlp_dr)
 
@@ -513,7 +506,7 @@ class VitGFN(nn.Module):
             Log_pz += Log_P_z_l
 
             ###apply the mask
-            out = out.mul(m.unsqueeze(2).unsqueeze(3))
+            out = out.mul(m.unsqueeze(2))
             actual_masks.append(m)
 
             x = out
