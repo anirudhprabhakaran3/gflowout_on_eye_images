@@ -142,11 +142,12 @@ class ResNetGFN(nn.Module):
             },
         ]
         self.q_zxy_optimizer = optim.Adam(q_zxy_param_list)
+        task_model_param_list = []
 
         if self.opt.tune_last_layer_only:
             task_model_param_list = [{"params": self.resnet.fc.parameters(), "lr": lr}]
         else:
-            task_model_params_list = [{"params": self.resnet.parameters(), "lr": lr}]
+            task_model_param_list = [{"params": self.resnet.parameters(), "lr": lr}]
 
         self.task_model_optimizer = optim.SGD(
             task_model_param_list, momentum=0.9, weight_decay=5e-4

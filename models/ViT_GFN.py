@@ -201,7 +201,7 @@ class VitGFN(nn.Module):
             logits = torch.logsumexp(torch.cat(logits, 2), 2)
 
         return (
-            logits_,
+            logits,
             actual_masks,
             masks_qz,
             masks_qzxy,
@@ -556,6 +556,10 @@ class VitGFN(nn.Module):
             Log_pzx,
             Log_pz,
         ) = self.GFN_forward(x, y, mask)
+
+        y = torch.nn.functional.one_hot(
+            y, self.num_classes
+        ).float()
 
         # loss calculation
         # CEloss = F.nll_loss(logits, y)
