@@ -6,14 +6,14 @@ import timm
 import random
 import numpy as np
 
-from utils.GFNUtils import (
+from GFNUtils import (
     RandomMaskGenerator,
     CNN_MLP,
     construct_conditional_mask_generators,
     construct_multiinput_conditional_mask_generators,
     construct_unconditional_mask_generators,
 )
-from utils.options import Options
+from options import Options
 
 
 class VitGFN(nn.Module):
