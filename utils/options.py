@@ -26,6 +26,7 @@ class Options:
         vit_flat_mlp_size=512,
         vit_flat_glimpses=1,
         vit_flat_out_size=1024,
+        num_epochs=100
     ):
         super(Options, self).__init__()
 
@@ -58,3 +59,4 @@ class Options:
 
         self.vit_ff_size = int(self.vit_hidden_size * 4)
         self.vit_hidden_size_head = int(self.vit_hidden_size / self.vit_multi_head)
+        self.num_epochs = num_epochs
